@@ -89,7 +89,7 @@ Output rules (STRICT):
 - No explanation, no markdown, no extra text.
 - Format: {{"matchedCharityNeeds": [sorted original objects], "status": {{"successful": true, "message": "All inputs returned in sorted order successfully"}}}}
 
-Failure case (only if parsing error):
+Failure case:
 {{"matchedCharityNeeds": [], "status": {{"successful": false, "message": "Unable to process request at this time"}}}}
 
 Input:
@@ -100,46 +100,7 @@ CharityNeeds: {needs}
 
 
 # =========================
-# Fallback ذكي
-# =========================
-def smart_fallback(donor, needs):
-    results = []
-
-    for n in needs:
-        score = 0
-
-        # category match
-        if n["category"].lower() in donor["donorOrganizationDescription"].lower():
-            score += 0.4
-
-        # city match
-        if n["city"] == donor["city"]:
-            score += 0.3
-        elif n["governorate"] == donor["governorate"]:
-            score += 0.2
-
-        # priority
-        if n["priority"].lower() == "high":
-            score += 0.2
-        elif n["priority"].lower() == "medium":
-            score += 0.1
-
-        score = round(min(score, 1), 2)
-
-        results.append({
-            "needId": n["charityNeedId"],
-            "score": score,
-            "reason": "Fallback smart matching"
-        })
-
-    # ترتيب تنازلي
-    results.sort(key=lambda x: x["score"], reverse=True)
-
-    return results
-
-
-# =========================
-# 🤖 AI + fallback
+#  AI Matching
 # =========================
 def match_with_ai(donor, needs):
     cache_key = make_cache_key(donor, needs)
@@ -154,8 +115,7 @@ def match_with_ai(donor, needs):
                 "status": {
                     "successful": True,
                     "message": "Returned sorted charity needs from cache"
-                },
-                "source": "cache"
+                }
             }
 
     try:
@@ -175,34 +135,41 @@ def match_with_ai(donor, needs):
             }
         )
 
-        data = response.json()
+        if response.status_code == 200:
+            data = response.json()
 
-        text = data["choices"][0]["message"]["content"]
+            text = data["choices"][0]["message"]["content"]
 
-        cleaned = text.replace("```json", "").replace("```", "").strip()
+            cleaned = text.replace("```json", "").replace("```", "").strip()
 
-        parsed = json.loads(cleaned)
+            parsed = json.loads(cleaned)
 
-        sorted_ids = [item["charityNeedId"] for item in parsed.get("matchedCharityNeeds", [])]
-        if sorted_ids:
-            cache_sorted_ids(cache_key, sorted_ids)
-        
-        return {
-            "matchedCharityNeeds": parsed.get("matchedCharityNeeds", []),
-            "status": parsed.get("status", {
-                "successful": False,
-                "message": "Invalid AI response"
-            }),
-            "source": "ai"
-        }
+            sorted_ids = [item["charityNeedId"] for item in parsed.get("matchedCharityNeeds", [])]
+            if sorted_ids:
+                cache_sorted_ids(cache_key, sorted_ids)
+
+            return {
+                "matchedCharityNeeds": parsed.get("matchedCharityNeeds", []),
+                "status": parsed.get("status", {
+                    "successful": True,
+                    "message": "Matching completed successfully"
+                })
+            }
+        else:
+            return {
+                "matchedCharityNeeds": [],
+                "status": {
+                    "successful": False,
+                    "message": "failed in calling tools"
+                }
+            }
 
     except Exception as e:
         return {
             "matchedCharityNeeds": [],
             "status": {
                 "successful": False,
-                "message": str(e)
-            },
-            "source": "fallback"
+                "message": "failed in calling tools"
+            }
         }
         

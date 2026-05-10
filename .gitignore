@@ -17,6 +17,7 @@ pip-delete-this-directory.txt
 .coverage
 .coverage.*
 .pytest_cache/
+.env
 
 # IDE
 .vscode/

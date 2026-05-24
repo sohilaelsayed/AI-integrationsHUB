@@ -13,7 +13,7 @@ ENV_PATH = BASE_DIR / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 API_KEY = OPENROUTER_API_KEY
-CACHE_TTL_SECONDS = 3600
+CACHE_TTL_SECONDS = 7200
 
 redis_client = None
 if REDIS_URL:
